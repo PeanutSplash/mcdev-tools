@@ -2,7 +2,7 @@
     "name": "mcdev-tools-plus",
     "displayName": "MC Dev Tools Plus",
     "description": "一个用于我的世界中国版模组开发的调试工具插件。基于 Dofes/mcdev-tools 二次开发。",
-    "version": "0.1.27",
+    "version": "0.1.28",
     "author": "Dofes",
     "publisher": "peanutsplash",
     "license": "MIT",
