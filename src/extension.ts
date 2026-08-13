@@ -6,6 +6,7 @@ import { McDevToolsSidebarProvider } from './sidebar';
 import { dynamicLibraryManager } from './native/dynamicLibraryManager';
 import { GameDebuggerPanel, HostBridgeManager, PreparedHostBridgeLaunch } from './hostBridge';
 import { shutdownAllNativeProfilerCaptures } from './hostBridge/nativeProfilerCapture';
+import { McpBridgeManager } from './mcpBridge';
 import { McdevConfigStore } from './config';
 import { 
     McDevToolsDebugConfigurationProvider,
@@ -17,6 +18,7 @@ let extensionContext: vscode.ExtensionContext;
 let mcdevConfigStore: McdevConfigStore | undefined;
 let hostBridgeManager: HostBridgeManager | undefined;
 let gameDebuggerPanel: GameDebuggerPanel | undefined;
+let mcpBridgeManager: McpBridgeManager | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Minecraft ModPC Debug 插件已激活');
@@ -49,6 +51,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const sidebarDisp = vscode.window.registerWebviewViewProvider('mcdev-tools.sidebar', sidebarProvider);
         context.subscriptions.push(sidebarProvider, sidebarDisp);
         console.log('McDevToolsSidebarProvider 已注册');
+    }
+
+    // 启动常驻 MCP 桥接服务。不 await：探活最长 15 秒，不应拖慢插件激活
+    if (pluginEnabled) {
+        void McpBridgeManager.create(context).then((manager) => {
+            mcpBridgeManager = manager;
+            if (manager) {
+                context.subscriptions.push(manager);
+            }
+        });
     }
 
     // 注册命令
@@ -84,7 +96,28 @@ function registerCommands(context: vscode.ExtensionContext): void {
         gameDebuggerPanel?.show();
     });
 
-    context.subscriptions.push(startDebugCmd, panelCmd, runCmd, openGameDebuggerCmd);
+    // 复制 MCP 客户端配置
+    const copyMcpConfigCmd = vscode.commands.registerCommand('mcdev-tools.copyMcpConfig', async () => {
+        const config = vscode.workspace.getConfiguration('mcdev-tools');
+        const port = config.get<number>('mcpBridge.port', 19134);
+        const url = mcpBridgeManager?.url ?? `http://127.0.0.1:${port}/mcp`;
+        const snippet = JSON.stringify({
+            mcpServers: {
+                minecraft_be_mcdk: { type: 'http', url }
+            }
+        }, null, 2);
+
+        await vscode.env.clipboard.writeText(snippet);
+        if (mcpBridgeManager) {
+            vscode.window.showInformationMessage(`MCP 配置已复制：${url}`);
+        } else {
+            vscode.window.showWarningMessage(
+                `MCP 配置已复制，但桥接服务当前未运行：${url}`
+            );
+        }
+    });
+
+    context.subscriptions.push(startDebugCmd, panelCmd, runCmd, openGameDebuggerCmd, copyMcpConfigCmd);
 }
 
 /**
@@ -266,9 +299,11 @@ async function runMcdk(): Promise<void> {
 export async function deactivate(): Promise<void> {
     const panel = gameDebuggerPanel;
     const bridgeManager = hostBridgeManager;
+    const mcpBridge = mcpBridgeManager;
     const configStore = mcdevConfigStore;
     gameDebuggerPanel = undefined;
     hostBridgeManager = undefined;
+    mcpBridgeManager = undefined;
     mcdevConfigStore = undefined;
 
     try {
@@ -284,6 +319,11 @@ export async function deactivate(): Promise<void> {
             await bridgeManager?.disposeAsync();
         } catch (error) {
             console.error('Failed to dispose the Host Bridge manager', error);
+        }
+        try {
+            await mcpBridge?.disposeAsync();
+        } catch (error) {
+            console.error('Failed to dispose the MCP bridge manager', error);
         }
         try {
             configStore?.dispose();

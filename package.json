@@ -66,6 +66,11 @@
                 "command": "mcdev-tools.openGameDebugger",
                 "title": "MC Dev Tools: 打开游戏调试",
                 "icon": "$(terminal)"
+            },
+            {
+                "command": "mcdev-tools.copyMcpConfig",
+                "title": "MC Dev Tools: 复制 MCP 配置",
+                "icon": "$(clippy)"
             }
         ],
         "debuggers": [
@@ -265,6 +270,21 @@
                     "type": "boolean",
                     "default": false,
                     "description": "是否启用 MC Dev Tools 插件（若启用则即使未检测到项目结构也会激活）。建议只在 MC addon 项目手动开启。"
+                },
+                "mcdev-tools.mcpBridge.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "是否启动常驻 MCP 桥接服务（mcdk_stdio_bridge），供 AI 客户端通过固定 URL 接入"
+                },
+                "mcdev-tools.mcpBridge.port": {
+                    "type": "number",
+                    "default": 19134,
+                    "description": "MCP 桥接服务对外监听的端口，客户端连接 http://127.0.0.1:<端口>/mcp"
+                },
+                "mcdev-tools.mcpBridge.gamePort": {
+                    "type": "number",
+                    "default": 19133,
+                    "description": "游戏内 MCP 端口（桥接服务向内连接使用），需与 mcdev.json 的 mcp_server_config.server_port 一致"
                 },
                 "mcdev-tools.ptvsd.enabled": {
                     "type": "boolean",
