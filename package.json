@@ -1,14 +1,19 @@
 {
-    "name": "mcdev-tools",
-    "displayName": "MC Dev Tools",
-    "description": "一个用于我的世界中国版模组开发的调试工具插件。",
+    "name": "mcdev-tools-plus",
+    "displayName": "MC Dev Tools Plus",
+    "description": "一个用于我的世界中国版模组开发的调试工具插件。基于 Dofes/mcdev-tools 二次开发。",
     "version": "0.1.27",
     "author": "Dofes",
-    "publisher": "dofes",
+    "publisher": "peanutsplash",
+    "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/Dofes/mcdev-tools"
+        "url": "https://github.com/PeanutSplash/mcdev-tools"
     },
+    "bugs": {
+        "url": "https://github.com/PeanutSplash/mcdev-tools/issues"
+    },
+    "homepage": "https://github.com/PeanutSplash/mcdev-tools#readme",
     "icon": "images/icon.png",
     "engines": {
         "vscode": "^1.85.0"

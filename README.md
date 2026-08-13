@@ -1,8 +1,10 @@
-# MC Dev Tools
+# MC Dev Tools Plus
 
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=dofes.mcdev-tools)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=peanutsplash.mcdev-tools-plus)
 
 一个用于我的世界中国版模组开发的一站式 VSCode 工具插件
+
+> 本插件基于 [Dofes/mcdev-tools](https://github.com/Dofes/mcdev-tools) 二次开发，遵循 MIT 协议。原作者 [@Dofes](https://github.com/Dofes)。
 
 ## 功能
 
