@@ -1,6 +1,7 @@
 # MC Dev Tools Plus
 
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=peanutsplash.mcdev-tools-plus)
+[![发布](https://github.com/PeanutSplash/mcdev-tools/actions/workflows/publish.yml/badge.svg)](https://github.com/PeanutSplash/mcdev-tools/actions/workflows/publish.yml)
 
 一个用于我的世界中国版模组开发的一站式 VSCode 工具插件
 
@@ -10,7 +11,7 @@
 
 - **官方调试器支持**：通过官方调试器接口进行 Python 调试，启动并自动管理调试会话
 - 支持多客户端调试，自动分配可用端口
-- 一键启动 `mcdk.exe` 启动游戏开发测试
+- 一键启动 `mcdk.exe` 启动游戏开发测试，游戏运行时按钮变为「停止游戏」，随时可结束
 - **内置 MCP 服务**：常驻的 MCP 桥接服务，让 AI 客户端通过固定 URL 观察和操作游戏
 - 侧边栏可视化配置面板（皮肤编辑、昼夜更替、窗口样式等）
 
