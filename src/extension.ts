@@ -8,6 +8,7 @@ import { GameDebuggerPanel, HostBridgeManager, PreparedHostBridgeLaunch } from '
 import { shutdownAllNativeProfilerCaptures } from './hostBridge/nativeProfilerCapture';
 import { McpBridgeManager } from './mcpBridge';
 import { McdevConfigStore } from './config';
+import { GameProcessMonitor } from './game';
 import { 
     McDevToolsDebugConfigurationProvider,
     McdbgDebugConfigurationProvider,
@@ -19,6 +20,7 @@ let mcdevConfigStore: McdevConfigStore | undefined;
 let hostBridgeManager: HostBridgeManager | undefined;
 let gameDebuggerPanel: GameDebuggerPanel | undefined;
 let mcpBridgeManager: McpBridgeManager | undefined;
+let gameProcessMonitor: GameProcessMonitor | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Minecraft ModPC Debug 插件已激活');
@@ -30,6 +32,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(hostBridgeManager);
     gameDebuggerPanel = new GameDebuggerPanel(context.extensionUri, hostBridgeManager);
     context.subscriptions.push(gameDebuggerPanel);
+    gameProcessMonitor = new GameProcessMonitor();
+    context.subscriptions.push(gameProcessMonitor);
 
     // 初始化 ptvsd 持久化存储
     ptvsd.initStorage(context);
@@ -47,7 +51,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // 只有启用时才注册侧边栏提供器
     if (pluginEnabled) {
-        const sidebarProvider = new McDevToolsSidebarProvider(context.extensionUri, mcdevConfigStore);
+        const sidebarProvider = new McDevToolsSidebarProvider(
+            context.extensionUri,
+            mcdevConfigStore,
+            gameProcessMonitor
+        );
         const sidebarDisp = vscode.window.registerWebviewViewProvider('mcdev-tools.sidebar', sidebarProvider);
         context.subscriptions.push(sidebarProvider, sidebarDisp);
         console.log('McDevToolsSidebarProvider 已注册');
@@ -92,6 +100,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
         await runMcdk();
     });
 
+    // 停止游戏命令
+    const stopCmd = vscode.commands.registerCommand('mcdev-tools.stopGame', async () => {
+        await stopGame();
+    });
+
     const openGameDebuggerCmd = vscode.commands.registerCommand('mcdev-tools.openGameDebugger', () => {
         gameDebuggerPanel?.show();
     });
@@ -117,7 +130,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         }
     });
 
-    context.subscriptions.push(startDebugCmd, panelCmd, runCmd, openGameDebuggerCmd, copyMcpConfigCmd);
+    context.subscriptions.push(startDebugCmd, panelCmd, runCmd, stopCmd, openGameDebuggerCmd, copyMcpConfigCmd);
 }
 
 /**
@@ -215,7 +228,14 @@ async function showSidebarPanel(context: vscode.ExtensionContext): Promise<void>
     if (!mcdevConfigStore) {
         throw new Error('.mcdev.json configuration store is not initialized');
     }
-    const provider = new McDevToolsSidebarProvider(context.extensionUri, mcdevConfigStore);
+    if (!gameProcessMonitor) {
+        throw new Error('Game process monitor is not initialized');
+    }
+    const provider = new McDevToolsSidebarProvider(
+        context.extensionUri,
+        mcdevConfigStore,
+        gameProcessMonitor
+    );
     provider.resolveWebviewPanel(panel);
     context.subscriptions.push(provider);
 }
@@ -292,8 +312,26 @@ async function runMcdk(): Promise<void> {
         hostBridgeManager.trackTerminal(bridgeLaunch.registrationId, terminal);
     }
 
+    gameProcessMonitor?.trackLaunch(terminal);
+
     terminal.show(true);
     vscode.window.showInformationMessage('Minecraft ModPC 已启动（无调试）');
+}
+
+/**
+ * 停止游戏（结束 mcdk 与 Minecraft 进程）
+ */
+async function stopGame(): Promise<void> {
+    if (!gameProcessMonitor) {
+        return;
+    }
+    if (gameProcessMonitor.currentStatus.state === 'stopped') {
+        vscode.window.showInformationMessage('当前没有正在运行的 Minecraft ModPC');
+        return;
+    }
+
+    await gameProcessMonitor.stopGame();
+    vscode.window.showInformationMessage('Minecraft ModPC 已停止');
 }
 
 export async function deactivate(): Promise<void> {
@@ -305,10 +343,12 @@ export async function deactivate(): Promise<void> {
     hostBridgeManager = undefined;
     mcpBridgeManager = undefined;
     mcdevConfigStore = undefined;
+    gameProcessMonitor = undefined;
 
     try {
         ptvsd.cleanupAllSessions();
         vscode.commands.executeCommand('setContext', 'mcdev-tools:enabled', false);
+        vscode.commands.executeCommand('setContext', 'mcdev-tools:gameRunning', false);
         vscode.commands.executeCommand('setContext', 'mcdev-tools:showSidebar', false);
         try {
             await panel?.disposeAsync();

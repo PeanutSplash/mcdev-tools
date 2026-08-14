@@ -9,6 +9,7 @@ import {
     getGameExecutablePaths,
     isGameExecutableDiscoverySupported
 } from '../native/gameDiscovery';
+import { GameProcessMonitor, GameStatus } from '../game';
 
 /**
  * 侧边栏 Webview 提供者，用于可视化编辑 .mcdev.json
@@ -18,10 +19,14 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
     private _configSubscription?: vscode.Disposable;
     private _reviewProcess?: cp.ChildProcess;
     private _messageSubscription?: vscode.Disposable;
-    
+    private _gameStatusSubscription?: vscode.Disposable;
+    private _gameWatch?: vscode.Disposable;
+    private _visibilitySubscription?: vscode.Disposable;
+
     constructor(
         private readonly _extensionUri: vscode.Uri,
-        private readonly _configStore: McdevConfigStore
+        private readonly _configStore: McdevConfigStore,
+        private readonly _gameMonitor: GameProcessMonitor
     ) {}
 
     public resolveWebviewView(
@@ -47,6 +52,17 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
 
             this.setupMessageHandler(webview);
             this.setupConfigSubscription(webview);
+            this.setupGameStatusSubscription(webview);
+
+            // 只在侧边栏可见时观察游戏进程，隐藏时停止轮询
+            this.setGameWatchActive(webviewView.visible);
+            this._visibilitySubscription?.dispose();
+            this._visibilitySubscription = webviewView.onDidChangeVisibility(() => {
+                this.setGameWatchActive(webviewView.visible);
+                if (webviewView.visible) {
+                    this.postGameStatus(webview, this._gameMonitor.currentStatus);
+                }
+            });
 
             // Clean up watcher when view is disposed
             webviewView.onDidDispose(() => {
@@ -63,6 +79,8 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
         webview.html = this.getHtmlForWebview(webview);
         this.setupMessageHandler(webview);
         this.setupConfigSubscription(webview);
+        this.setupGameStatusSubscription(webview);
+        this.setGameWatchActive(true);
         panel.onDidDispose(() => this.dispose());
     }
 
@@ -71,6 +89,11 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
         this._messageSubscription = undefined;
         this._configSubscription?.dispose();
         this._configSubscription = undefined;
+        this._gameStatusSubscription?.dispose();
+        this._gameStatusSubscription = undefined;
+        this._visibilitySubscription?.dispose();
+        this._visibilitySubscription = undefined;
+        this.setGameWatchActive(false);
         if (this._reviewProcess && !this._reviewProcess.killed) {
             this._reviewProcess.kill();
         }
@@ -112,6 +135,8 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
                 await this.handleUpdateSkinPreview(webview, msg.path);
             } else if (msg?.type === 'runGame') {
                 await vscode.commands.executeCommand('mcdev-tools.runGame');
+            } else if (msg?.type === 'stopGame') {
+                await vscode.commands.executeCommand('mcdev-tools.stopGame');
             } else if (msg?.type === 'startDebug') {
                 await vscode.commands.executeCommand('mcdev-tools.startDebug');
             } else if (msg?.type === 'browseGameExecutable') {
@@ -140,12 +165,44 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
     }
 
     /**
+     * 订阅游戏运行状态，变化时推送给 Webview
+     */
+    private setupGameStatusSubscription(webview: vscode.Webview): void {
+        this._gameStatusSubscription?.dispose();
+        this._gameStatusSubscription = this._gameMonitor.onDidChangeStatus(status => {
+            this.postGameStatus(webview, status);
+        });
+    }
+
+    /**
+     * 按需开关游戏进程轮询
+     */
+    private setGameWatchActive(active: boolean): void {
+        if (active) {
+            this._gameWatch ??= this._gameMonitor.watch();
+            return;
+        }
+        this._gameWatch?.dispose();
+        this._gameWatch = undefined;
+    }
+
+    private postGameStatus(webview: vscode.Webview, status: GameStatus): void {
+        void webview.postMessage({
+            type: 'gameStatus',
+            state: status.state,
+            processCount: status.processCount
+        });
+    }
+
+    /**
      * 处理 ready 消息
      */
     private async handleReady(webview: vscode.Webview): Promise<void> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         const language = vscode.env.language; // 获取 VS Code 语言设置
-        
+
+        this.postGameStatus(webview, this._gameMonitor.currentStatus);
+
         if (!workspaceFolder) {
             webview.postMessage({
                 type: 'init',

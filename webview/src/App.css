@@ -150,6 +150,15 @@ button:focus-visible {
   flex: 1 1 auto;
 }
 
+.btn-stop {
+  background-color: var(--vscode-statusBarItem-errorBackground, #c72e0f);
+  color: var(--vscode-statusBarItem-errorForeground, #ffffff);
+}
+
+.btn-stop:hover {
+  background-color: color-mix(in srgb, var(--vscode-statusBarItem-errorBackground, #c72e0f) 86%, #ffffff);
+}
+
 .btn-debug {
   flex: 0 0 var(--control-height);
   width: var(--control-height);

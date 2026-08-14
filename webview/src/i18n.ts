@@ -1,6 +1,9 @@
 export interface I18nText {
   runGame: string;
   runGameTooltip: string;
+  stopGame: string;
+  stopGameTooltip: string;
+  gameLaunching: string;
   startDebug: string;
   startDebugTooltip: string;
   openGameDebugger: string;
@@ -330,6 +333,9 @@ export const i18n: Record<string, I18nText> = {
   en: {
     runGame: 'Run Game',
     runGameTooltip: 'Start Minecraft with mcdk',
+    stopGame: 'Stop Game',
+    stopGameTooltip: 'Stop the running Minecraft instance',
+    gameLaunching: 'Starting…',
     startDebug: 'Start Debug',
     startDebugTooltip: 'Start Minecraft with Python debugger attached',
     openGameDebugger: 'Open Game Debugger',
@@ -658,6 +664,9 @@ export const i18n: Record<string, I18nText> = {
   zh: {
     runGame: '运行游戏',
     runGameTooltip: '使用 mcdk 启动 Minecraft',
+    stopGame: '停止游戏',
+    stopGameTooltip: '结束正在运行的 Minecraft',
+    gameLaunching: '启动中…',
     startDebug: '启动调试',
     startDebugTooltip: '启动 Minecraft 并附加 Python 调试器',
     openGameDebugger: '打开游戏调试',

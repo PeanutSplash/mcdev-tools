@@ -58,6 +58,11 @@
                 "icon": "$(play)"
             },
             {
+                "command": "mcdev-tools.stopGame",
+                "title": "MC Dev Tools: 停止游戏",
+                "icon": "$(debug-stop)"
+            },
+            {
                 "command": "mcdev-tools.showSidebarPanel",
                 "title": "MC Dev Tools: 打开侧边栏面板",
                 "icon": "$(window)"

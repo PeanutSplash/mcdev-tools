@@ -14,6 +14,8 @@ import { McpServerConfig } from './components/McpServerConfig';
 import { AssistantMcpLink } from './components/AssistantMcpLink';
 import './App.css';
 
+type GameRunState = 'stopped' | 'launching' | 'running';
+
 function App() {
   const [lang, setLang] = useState<string>('en');
   const t = i18n[lang] || i18n.en;
@@ -27,7 +29,8 @@ function App() {
   const [gameExecutableDiscoverySupported, setGameExecutableDiscoverySupported] = useState(false);
   const [gameExecutableDiscoveryLoaded, setGameExecutableDiscoveryLoaded] = useState(false);
   const [gameExecutablePaths, setGameExecutablePaths] = useState<string[]>([]);
-  
+  const [gameState, setGameState] = useState<GameRunState>('stopped');
+
   const initializedComponentsRef = useRef<Set<string>>(new Set());
   const initTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -91,6 +94,11 @@ function App() {
             ? msg.paths.filter((value: unknown): value is string => typeof value === 'string')
             : []);
           setGameExecutableDiscoveryLoaded(true);
+          break;
+        case 'gameStatus':
+          if (msg.state === 'stopped' || msg.state === 'launching' || msg.state === 'running') {
+            setGameState(msg.state);
+          }
           break;
       }
     };
@@ -319,18 +327,20 @@ function App() {
     setHasChanges(true);
   };
 
+  const gameActive = gameState !== 'stopped';
+
   return (
     <div className="container">
       {/* Toolbar */}
       <div className="toolbar">
-        <button 
+        <button
           type="button"
-          className="btn-primary btn-run" 
-          onClick={() => vscode.postMessage({ type: 'runGame' })}
-          title={t.runGameTooltip}
+          className={`btn-primary btn-run${gameActive ? ' btn-stop' : ''}`}
+          onClick={() => vscode.postMessage({ type: gameActive ? 'stopGame' : 'runGame' })}
+          title={gameActive ? t.stopGameTooltip : t.runGameTooltip}
         >
-          <span className="codicon codicon-play"></span>
-          {t.runGame}
+          <span className={`codicon ${gameActive ? 'codicon-debug-stop' : 'codicon-play'}`}></span>
+          {gameState === 'launching' ? t.gameLaunching : gameActive ? t.stopGame : t.runGame}
         </button>
         <button 
           type="button"
