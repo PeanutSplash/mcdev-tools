@@ -1,0 +1,80 @@
+name: 发布到 VS Code 市场
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 版本递增方式
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+# 同一时间只跑一个发布流程，避免两次推送抢同一个版本号
+concurrency:
+  group: marketplace-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 准备 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            webview/package-lock.json
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 安装 Webview 依赖
+        run: npm ci
+        working-directory: webview
+
+      - name: 编译检查
+        run: npm run compile
+
+      # 递增版本号并打上 tag。提交信息带 [skip ci]，配合 GITHUB_TOKEN 推送不触发工作流，双重避免自我循环
+      - name: 递增版本号
+        id: version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "${{ github.event.inputs.release_type || 'patch' }}" -m "chore(release): %s [skip ci]"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # 先打包再用同一个包发布，保证市场上的版本和 artifact 完全一致
+      - name: 打包扩展
+        run: npx --yes @vscode/vsce@latest package --out "mcdev-tools-plus-${{ steps.version.outputs.version }}.vsix"
+
+      - name: 发布到市场
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce@latest publish --packagePath "mcdev-tools-plus-${{ steps.version.outputs.version }}.vsix"
+
+      - name: 推回版本提交与标签
+        run: git push --follow-tags origin HEAD:main
+
+      - name: 上传 vsix
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcdev-tools-plus-${{ steps.version.outputs.version }}
+          path: "*.vsix"
