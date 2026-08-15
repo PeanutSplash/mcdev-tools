@@ -6,9 +6,9 @@ import { McDevToolsSidebarProvider } from './sidebar';
 import { dynamicLibraryManager } from './native/dynamicLibraryManager';
 import { GameDebuggerPanel, HostBridgeManager, PreparedHostBridgeLaunch } from './hostBridge';
 import { shutdownAllNativeProfilerCaptures } from './hostBridge/nativeProfilerCapture';
-import { McpBridgeManager } from './mcpBridge';
+import { GameLifecycleController, McpBridgeManager } from './mcpBridge';
 import { McdevConfigStore } from './config';
-import { GameProcessMonitor } from './game';
+import { findMcdkProcesses, GameProcessMonitor, isMinecraftRunning } from './game';
 import { 
     McDevToolsDebugConfigurationProvider,
     McdbgDebugConfigurationProvider,
@@ -63,7 +63,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // 启动常驻 MCP 桥接服务。不 await：探活最长 15 秒，不应拖慢插件激活
     if (pluginEnabled) {
-        void McpBridgeManager.create(context).then((manager) => {
+        void McpBridgeManager.create(context, mcpGameLifecycleController).then((manager) => {
             mcpBridgeManager = manager;
             if (manager) {
                 context.subscriptions.push(manager);
@@ -240,13 +240,30 @@ async function showSidebarPanel(context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(provider);
 }
 
+interface RunMcdkOptions {
+    /**
+     * 跳过 mcdk 的版本选择提示，直接用最新版本。
+     * 由 MCP（AI）发起的启动没人能回答提示，必须打开。
+     */
+    autoSelectLatestVersion?: boolean;
+    /** 失败时抛出而不是弹提示，供控制通道把错误回给调用方 */
+    throwOnError?: boolean;
+}
+
 /**
  * 运行 mcdk.exe（无调试模式，Ctrl+F5）
  */
-async function runMcdk(): Promise<void> {
+async function runMcdk(options: RunMcdkOptions = {}): Promise<void> {
+    const fail = (message: string): void => {
+        if (options.throwOnError) {
+            throw new Error(message);
+        }
+        vscode.window.showErrorMessage(message);
+    };
+
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage('请先打开工作区');
+        fail('请先打开工作区');
         return;
     }
 
@@ -260,7 +277,7 @@ async function runMcdk(): Promise<void> {
         : path.join(extensionContext.extensionPath, 'bin', 'native', 'windows', 'x64', 'mcdk.exe');
 
     if (!fs.existsSync(mcdkPath)) {
-        vscode.window.showErrorMessage(`找不到 mcdk.exe: ${mcdkPath}`);
+        fail(`找不到 mcdk.exe: ${mcdkPath}`);
         return;
     }
 
@@ -268,11 +285,15 @@ async function runMcdk(): Promise<void> {
     const mcRunning = await ptvsd.isMinecraftRunning();
 
     // 不设置 ptvsd 环境变量，正常启动（无调试）
-    const env: NodeJS.ProcessEnv = { 
+    const env: NodeJS.ProcessEnv = {
         ...process.env,
         MCDEV_IS_PLUGIN_ENV: '1',
         MCDEV_OUTPUT_MODE: '1'
     };
+
+    if (options.autoSelectLatestVersion) {
+        env['MCDEV_AUTO_SELECT_GAME_VERSION'] = '1';
+    }
 
     let bridgeLaunch: PreparedHostBridgeLaunch | undefined;
     if (hostBridgeManager) {
@@ -325,7 +346,9 @@ async function stopGame(): Promise<void> {
     if (!gameProcessMonitor) {
         return;
     }
-    if (gameProcessMonitor.currentStatus.state === 'stopped') {
+    // 游戏进程没了但 mcdk 还活着时（还占着游戏内 MCP 端口）也该允许停止
+    const hasLeftovers = await isMinecraftRunning() || (await findMcdkProcesses()).length > 0;
+    if (gameProcessMonitor.currentStatus.state === 'stopped' && !hasLeftovers) {
         vscode.window.showInformationMessage('当前没有正在运行的 Minecraft ModPC');
         return;
     }
@@ -333,6 +356,34 @@ async function stopGame(): Promise<void> {
     await gameProcessMonitor.stopGame();
     vscode.window.showInformationMessage('Minecraft ModPC 已停止');
 }
+
+/**
+ * 供 MCP 桥接工具调用的游戏生命周期入口
+ *
+ * 和侧边栏按钮走同一套逻辑：启动前先清场，并在 VS Code 集成终端里启动，
+ * 免得 AI 拉起的游戏跑到一个独立的控制台窗口里、还和旧会话并存。
+ */
+const mcpGameLifecycleController: GameLifecycleController = {
+    async start(): Promise<void> {
+        if (!gameProcessMonitor) {
+            throw new Error('插件未初始化游戏进程监视器');
+        }
+        // 无条件清场：上次会话遗留的 mcdk 可能已经没有游戏进程，却仍占着游戏内 MCP
+        // 端口，新会话起来后 AI 会继续连到那个僵尸进程上。
+        await gameProcessMonitor.stopGame();
+        if (!await gameProcessMonitor.waitUntilStopped()) {
+            throw new Error('已请求停止旧的会话，但 mcdk 或 Minecraft 进程在超时时间内仍未退出');
+        }
+        await runMcdk({ autoSelectLatestVersion: true, throwOnError: true });
+    },
+    async stop(): Promise<void> {
+        if (!gameProcessMonitor) {
+            throw new Error('插件未初始化游戏进程监视器');
+        }
+        await gameProcessMonitor.stopGame();
+        await gameProcessMonitor.waitUntilStopped();
+    }
+};
 
 export async function deactivate(): Promise<void> {
     const panel = gameDebuggerPanel;

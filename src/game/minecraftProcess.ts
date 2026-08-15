@@ -8,6 +8,9 @@ import * as cp from 'child_process';
 /** tasklist 过滤用的游戏映像名 */
 const MINECRAFT_IMAGE_NAME = 'Minecraft.Windows.exe';
 
+/** mcdk 启动器映像名。注意与常驻的 mcdk_stdio_bridge.exe 不同，tasklist 是精确匹配 */
+const MCDK_IMAGE_NAME = 'mcdk.exe';
+
 /** 探测与终止命令的最长等待时间，避免轮询被卡住的命令拖住 */
 const COMMAND_TIMEOUT_MS = 5000;
 
@@ -35,9 +38,9 @@ function execFileText(command: string, args: string[]): Promise<string> {
 }
 
 /**
- * 列出系统中正在运行的 Minecraft 进程
+ * 按映像名列出正在运行的进程
  */
-export async function findMinecraftProcesses(): Promise<MinecraftProcess[]> {
+async function findProcessesByImage(imageName: string): Promise<MinecraftProcess[]> {
     if (process.platform !== 'win32') {
         return [];
     }
@@ -45,7 +48,7 @@ export async function findMinecraftProcesses(): Promise<MinecraftProcess[]> {
     let stdout: string;
     try {
         stdout = await execFileText('tasklist', [
-            '/FI', `IMAGENAME eq ${MINECRAFT_IMAGE_NAME}`,
+            '/FI', `IMAGENAME eq ${imageName}`,
             '/FO', 'CSV',
             '/NH'
         ]);
@@ -66,6 +69,23 @@ export async function findMinecraftProcesses(): Promise<MinecraftProcess[]> {
         }
     }
     return processes;
+}
+
+/**
+ * 列出系统中正在运行的 Minecraft 进程
+ */
+export async function findMinecraftProcesses(): Promise<MinecraftProcess[]> {
+    return findProcessesByImage(MINECRAFT_IMAGE_NAME);
+}
+
+/**
+ * 列出系统中正在运行的 mcdk 启动器进程
+ *
+ * 插件自己拉起的 mcdk 是终端的 shell 进程，能直接按终端结束；这里用于清理
+ * 由桥接工具或上一次会话遗留下来的、没有终端归属的 mcdk。
+ */
+export async function findMcdkProcesses(): Promise<MinecraftProcess[]> {
+    return findProcessesByImage(MCDK_IMAGE_NAME);
 }
 
 /**

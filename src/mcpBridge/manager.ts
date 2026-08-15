@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as net from 'net';
 import * as path from 'path';
 import { getMcdkPath } from '../debugger/ptvsd';
+import { GameLifecycleController, McpControlServer } from './controlServer';
 
 const READY_TIMEOUT_MS = 15000;
 const CHECK_INTERVAL_MS = 300;
@@ -61,6 +62,7 @@ async function waitForPort(host: string, port: number, timeout: number): Promise
  */
 export class McpBridgeManager implements vscode.Disposable {
     private process: cp.ChildProcess | undefined;
+    private controlServer: McpControlServer | undefined;
     private disposed = false;
 
     private constructor(
@@ -71,8 +73,14 @@ export class McpBridgeManager implements vscode.Disposable {
 
     /**
      * 启动桥接工具。返回 undefined 表示未启用或启动失败，此时插件其余功能不受影响。
+     *
+     * gameController 用于把 start_game / stop_game 交回插件执行，这样 AI 拉起的游戏
+     * 也走 VS Code 集成终端，并且会先停掉已有会话。
      */
-    public static async create(context: vscode.ExtensionContext): Promise<McpBridgeManager | undefined> {
+    public static async create(
+        context: vscode.ExtensionContext,
+        gameController: GameLifecycleController
+    ): Promise<McpBridgeManager | undefined> {
         const config = vscode.workspace.getConfiguration('mcdev-tools');
         if (!config.get<boolean>('mcpBridge.enabled', true)) {
             return undefined;
@@ -114,6 +122,13 @@ export class McpBridgeManager implements vscode.Disposable {
             ));
         }
 
+        // 控制通道拿不到时桥接工具会退回自行 spawn，功能降级但不至于不可用
+        const controlServer = await McpControlServer.create(gameController);
+        if (controlServer) {
+            args.push('--control-port', String(controlServer.port));
+            args.push('--control-token', controlServer.token);
+        }
+
         const child = cp.spawn(bridgePath, args, {
             cwd: workspaceFolder?.uri.fsPath,
             windowsHide: true,
@@ -122,6 +137,7 @@ export class McpBridgeManager implements vscode.Disposable {
 
         const manager = new McpBridgeManager(host, port, true);
         manager.process = child;
+        manager.controlServer = controlServer;
 
         child.stderr?.on('data', (data: Buffer) => {
             console.log(`[mcdk_stdio_bridge] ${data.toString().trim()}`);
@@ -162,7 +178,10 @@ export class McpBridgeManager implements vscode.Disposable {
     public async disposeAsync(): Promise<void> {
         this.disposed = true;
         const child = this.process;
+        const controlServer = this.controlServer;
         this.process = undefined;
+        this.controlServer = undefined;
+        controlServer?.dispose();
 
         if (!child || !this.ownsProcess) {
             return;

@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { findMinecraftProcesses, terminateProcessTree } from './minecraftProcess';
+import { findMcdkProcesses, findMinecraftProcesses, terminateProcessTree } from './minecraftProcess';
 
 export type GameRunState = 'stopped' | 'launching' | 'running';
 
@@ -18,6 +18,10 @@ const POLL_INTERVAL_MS = 2000;
 
 /** 启动过程中的轮询间隔，让状态尽快跟上 */
 const LAUNCHING_POLL_INTERVAL_MS = 800;
+
+/** 等待进程退出的轮询间隔与上限 */
+const STOP_WAIT_INTERVAL_MS = 300;
+const STOP_WAIT_TIMEOUT_MS = 15000;
 
 export class GameProcessMonitor implements vscode.Disposable {
     private readonly statusEmitter = new vscode.EventEmitter<GameStatus>();
@@ -79,7 +83,9 @@ export class GameProcessMonitor implements vscode.Disposable {
     }
 
     /**
-     * 结束游戏：先终止插件启动的 mcdk 进程树，再清理残留的游戏进程
+     * 结束游戏：先终止插件启动的 mcdk 进程树，再清理残留的 mcdk 与游戏进程
+     *
+     * mcdk 要排在 Minecraft 前面结束，否则它会把游戏进程的退出当成重启信号再拉一个起来。
      */
     public async stopGame(): Promise<void> {
         const terminals = [...this.launchTerminals];
@@ -97,6 +103,15 @@ export class GameProcessMonitor implements vscode.Disposable {
             terminal.dispose();
         }
 
+        // 桥接工具冷启动或上次会话遗留的 mcdk 没有终端归属，只能按映像名清理
+        for (const target of await findMcdkProcesses()) {
+            try {
+                await terminateProcessTree(target.pid);
+            } catch (error) {
+                console.warn(`结束 mcdk 进程 ${target.pid} 失败`, error);
+            }
+        }
+
         for (const target of await findMinecraftProcesses()) {
             try {
                 await terminateProcessTree(target.pid);
@@ -106,6 +121,22 @@ export class GameProcessMonitor implements vscode.Disposable {
         }
 
         await this.refresh();
+    }
+
+    /**
+     * 等待游戏进程真正消失。返回 false 表示超时仍有残留。
+     */
+    public async waitUntilStopped(timeoutMs = STOP_WAIT_TIMEOUT_MS): Promise<boolean> {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            if ((await findMinecraftProcesses()).length === 0 && (await findMcdkProcesses()).length === 0) {
+                await this.refresh();
+                return true;
+            }
+            await new Promise(resolve => setTimeout(resolve, STOP_WAIT_INTERVAL_MS));
+        }
+        await this.refresh();
+        return (await findMinecraftProcesses()).length === 0;
     }
 
     public dispose(): void {
