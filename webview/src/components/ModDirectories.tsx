@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { vscode } from '../vscode';
 import { I18nText } from '../i18n';
+import { ModDirCandidate } from '../types';
 
 interface ModDir {
   path: string;
@@ -13,7 +14,130 @@ interface Props {
   modDirs: ModDir[];
   setModDirs: (dirs: ModDir[]) => void;
   setHasChanges: (changed: boolean) => void;
+  candidates: ModDirCandidate[];
+  candidatesLoaded: boolean;
+  onRequestCandidates: (refresh?: boolean) => void;
 }
+
+/** 归一化路径以便比较：`./mods/x`、`mods/x`、`mods/x/` 视为同一目录 */
+const normalizePathKey = (value: string): string => {
+  const normalized = value.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+  if (normalized === '' || normalized === '.') return '';
+  return normalized.replace(/^\.\//, '').toLowerCase();
+};
+
+interface CandidateMenuProps {
+  t: I18nText;
+  candidates: ModDirCandidate[];
+  loaded: boolean;
+  isUsed: (candidate: ModDirCandidate) => boolean;
+  selectedKey?: string;
+  onSelect: (candidate: ModDirCandidate) => void;
+  onRefresh: () => void;
+}
+
+const ModCandidateMenu: React.FC<CandidateMenuProps> = ({
+  t,
+  candidates,
+  loaded,
+  isUsed,
+  selectedKey,
+  onSelect,
+  onRefresh,
+}) => {
+  const [filter, setFilter] = useState('');
+  const filterRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    filterRef.current?.focus();
+  }, []);
+
+  const keyword = filter.trim().toLowerCase();
+  const visibleCandidates = keyword
+    ? candidates.filter(candidate =>
+        candidate.name.toLowerCase().includes(keyword) ||
+        candidate.path.toLowerCase().includes(keyword))
+    : candidates;
+
+  const describePacks = (candidate: ModDirCandidate): string => [
+    candidate.behaviorPacks > 0 ? `${candidate.behaviorPacks} BP` : '',
+    candidate.resourcePacks > 0 ? `${candidate.resourcePacks} RP` : '',
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className="mod-picker-menu">
+      <div className="mod-picker-toolbar">
+        <span className="codicon codicon-search" aria-hidden="true"></span>
+        <input
+          ref={filterRef}
+          type="text"
+          className="mod-picker-filter"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          placeholder={t.modDiscoveryFilter}
+          aria-label={t.modDiscoveryFilter}
+        />
+        <button
+          type="button"
+          className="btn-icon"
+          onClick={onRefresh}
+          title={t.modDiscoveryRefresh}
+          aria-label={t.modDiscoveryRefresh}
+        >
+          <span className={`codicon ${loaded ? 'codicon-refresh' : 'codicon-loading codicon-modifier-spin'}`}></span>
+        </button>
+      </div>
+      <div className="mod-picker-list" role="listbox" aria-label={t.modDiscoveryShow}>
+        {!loaded ? (
+          <div className="mod-picker-state" aria-live="polite">
+            <span className="codicon codicon-loading codicon-modifier-spin"></span>
+            <span>{t.modDiscoveryScanning}</span>
+          </div>
+        ) : visibleCandidates.length === 0 ? (
+          <div className="mod-picker-state">
+            <span className="codicon codicon-search-stop"></span>
+            <span>{candidates.length === 0 ? t.modDiscoveryEmpty : t.modDiscoveryNoMatch}</span>
+          </div>
+        ) : visibleCandidates.map((candidate) => {
+          const selected = selectedKey !== undefined
+            && normalizePathKey(candidate.path) === selectedKey;
+          const used = !selected && isUsed(candidate);
+          const packs = describePacks(candidate);
+          return (
+            <button
+              key={candidate.absolutePath}
+              type="button"
+              className={`mod-picker-option${selected ? ' selected' : ''}${used ? ' used' : ''}`}
+              role="option"
+              aria-selected={selected}
+              disabled={used}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onSelect(candidate)}
+              title={candidate.absolutePath}
+            >
+              <span
+                className={`codicon ${selected ? 'codicon-check' : used ? 'codicon-circle-filled' : 'codicon-symbol-folder'}`}
+                aria-hidden="true"
+              ></span>
+              <span className="mod-picker-option-content">
+                <span className="mod-picker-option-title">
+                  <span className="mod-picker-option-name">{candidate.name || candidate.path}</span>
+                  {candidate.isWorkspaceRoot && (
+                    <span className="mod-picker-tag">{t.modDiscoveryWorkspaceRoot}</span>
+                  )}
+                </span>
+                <span className="mod-picker-option-path">{candidate.path}</span>
+              </span>
+              <span className="mod-picker-meta">
+                {used ? t.modDiscoveryAdded : packs}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 type ReviewStatus = 'idle' | 'queued' | 'running' | 'clean' | 'issues' | 'error';
 type ReviewScope = 'mod';
@@ -45,10 +169,58 @@ const createReportName = (path: string, index: number) => {
   return `${String(index + 1).padStart(2, '0')}-${safeName}.md`;
 };
 
-export const ModDirectories: React.FC<Props> = ({ t, modDirs, setModDirs, setHasChanges }) => {
+export const ModDirectories: React.FC<Props> = ({
+  t,
+  modDirs,
+  setModDirs,
+  setHasChanges,
+  candidates,
+  candidatesLoaded,
+  onRequestCandidates,
+}) => {
   const [reviewStates, setReviewStates] = useState<Record<string, ReviewState>>({});
   const [reviewLauncherOpen, setReviewLauncherOpen] = useState(false);
   const [selectedReviewTarget, setSelectedReviewTarget] = useState<string | null>(null);
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+  const candidatesRequested = useRef(false);
+
+  const usedPathKeys = new Set(modDirs.map(dir => normalizePathKey(dir.path)));
+  const isCandidateUsed = (candidate: ModDirCandidate) =>
+    usedPathKeys.has(normalizePathKey(candidate.path)) ||
+    usedPathKeys.has(normalizePathKey(candidate.absolutePath));
+
+  const togglePicker = (key: string) => {
+    if (!candidatesRequested.current) {
+      candidatesRequested.current = true;
+      onRequestCandidates();
+    }
+    setOpenPicker(current => (current === key ? null : key));
+  };
+
+  const refreshCandidates = () => {
+    candidatesRequested.current = true;
+    onRequestCandidates(true);
+  };
+
+  useEffect(() => {
+    if (openPicker === null) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement | null)?.closest('.mod-picker-root')) {
+        setOpenPicker(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenPicker(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openPicker]);
 
   const availableReviewTargets: ReviewTarget[] = modDirs.map((dir, index) => ({
       targetId: `mod:${dir.path}`,
@@ -188,6 +360,12 @@ export const ModDirectories: React.FC<Props> = ({ t, modDirs, setModDirs, setHas
     setHasChanges(true);
   };
 
+  const addCandidate = (candidate: ModDirCandidate) => {
+    setModDirs([...modDirs, { path: candidate.path, hot_reload: true, enabled: true }]);
+    setHasChanges(true);
+    setOpenPicker(null);
+  };
+
   return (
     <div className="section">
       <div className="section-header-plain">
@@ -297,13 +475,39 @@ export const ModDirectories: React.FC<Props> = ({ t, modDirs, setModDirs, setHas
                 </div>
               )}
               <div className="mod-row">
-                <input
-                  type="text"
-                  className="mod-path"
-                  value={dir.path}
-                  onChange={(e) => updatePath(idx, e.target.value)}
-                  placeholder="./ or D:/Mods"
-                />
+                <div className={`mod-picker-root mod-path-picker${openPicker === `row-${idx}` ? ' open' : ''}`}>
+                  <input
+                    type="text"
+                    className="mod-path"
+                    value={dir.path}
+                    onChange={(e) => updatePath(idx, e.target.value)}
+                    placeholder="./ or D:/Mods"
+                  />
+                  <button
+                    type="button"
+                    className="mod-path-toggle"
+                    onClick={() => togglePicker(`row-${idx}`)}
+                    title={t.modDiscoveryShow}
+                    aria-label={t.modDiscoveryShow}
+                    aria-expanded={openPicker === `row-${idx}`}
+                  >
+                    <span className="codicon codicon-chevron-down"></span>
+                  </button>
+                  {openPicker === `row-${idx}` && (
+                    <ModCandidateMenu
+                      t={t}
+                      candidates={candidates}
+                      loaded={candidatesLoaded}
+                      isUsed={isCandidateUsed}
+                      selectedKey={normalizePathKey(dir.path)}
+                      onSelect={(candidate) => {
+                        updatePath(idx, candidate.path);
+                        setOpenPicker(null);
+                      }}
+                      onRefresh={refreshCandidates}
+                    />
+                  )}
+                </div>
                 <button
                   type="button"
                   className="btn-icon browse"
@@ -415,13 +619,39 @@ export const ModDirectories: React.FC<Props> = ({ t, modDirs, setModDirs, setHas
       )}
 
       <div className="mod-add-action">
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => vscode.postMessage({ type: 'browseFolder', index: -1 })}
-        >
-          <span className="codicon codicon-folder-opened"></span> {t.addModDirectory}
-        </button>
+        <div className={`mod-picker-root mod-add-picker${openPicker === 'add' ? ' open' : ''}`}>
+          <div className="mod-add-row">
+            <button
+              type="button"
+              className="btn-primary mod-add-discover"
+              onClick={() => togglePicker('add')}
+              aria-expanded={openPicker === 'add'}
+            >
+              <span className="codicon codicon-add"></span>
+              <span className="mod-add-label">{t.addModDirectory}</span>
+              <span className="codicon codicon-chevron-down mod-add-caret"></span>
+            </button>
+            <button
+              type="button"
+              className="btn-icon browse"
+              onClick={() => vscode.postMessage({ type: 'browseFolder', index: -1 })}
+              title={t.browseModDirectory}
+              aria-label={t.browseModDirectory}
+            >
+              <span className="codicon codicon-folder-opened"></span>
+            </button>
+          </div>
+          {openPicker === 'add' && (
+            <ModCandidateMenu
+              t={t}
+              candidates={candidates}
+              loaded={candidatesLoaded}
+              isUsed={isCandidateUsed}
+              onSelect={addCandidate}
+              onRefresh={refreshCandidates}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

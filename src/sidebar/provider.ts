@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as cp from 'child_process';
 import { getNonce } from '../utils';
 import { ensureMcdevDirectory } from '../utils/mcdevDirectory';
+import { discoverModDirectories } from '../utils/modDiscovery';
 import { McdevConfigSnapshot, McdevConfigStore } from '../config';
 import {
     getGameExecutablePaths,
@@ -143,6 +144,8 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
                 await this.handleBrowseGameExecutable(webview, msg.currentPath);
             } else if (msg?.type === 'getGameExecutablePaths') {
                 await this.handleGetGameExecutablePaths(webview);
+            } else if (msg?.type === 'getModDirCandidates') {
+                await this.handleGetModDirCandidates(webview, msg.refresh === true);
             } else if (msg?.type === 'openExternal') {
                 await this.handleOpenExternal(msg.url);
             } else if (msg?.type === 'runCodeReview') {
@@ -372,6 +375,20 @@ export class McDevToolsSidebarProvider implements vscode.WebviewViewProvider, vs
         } catch (error) {
             console.error('Failed to discover game executable paths:', error);
             await webview.postMessage({ type: 'gameExecutablePaths', paths: [] });
+        }
+    }
+
+    /**
+     * 扫描工作区并返回可选的 MOD 目录
+     */
+    private async handleGetModDirCandidates(webview: vscode.Webview, refresh: boolean): Promise<void> {
+        const roots = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+        try {
+            const candidates = await discoverModDirectories(roots, { refresh });
+            await webview.postMessage({ type: 'modDirCandidates', candidates });
+        } catch (error) {
+            console.error('Failed to discover mod directories:', error);
+            await webview.postMessage({ type: 'modDirCandidates', candidates: [] });
         }
     }
 

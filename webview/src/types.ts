@@ -4,6 +4,16 @@ export interface ModDir {
   enabled: boolean;
 }
 
+/** 扩展端自动发现的 MOD 目录候选 */
+export interface ModDirCandidate {
+  path: string;
+  absolutePath: string;
+  name: string;
+  behaviorPacks: number;
+  resourcePacks: number;
+  isWorkspaceRoot: boolean;
+}
+
 export interface McdevData {
   game_executable_path?: string;
   world_name?: string;

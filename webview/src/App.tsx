@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { vscode } from './vscode';
 import { i18n } from './i18n';
-import { ModDir, McdevData } from './types';
+import { ModDir, ModDirCandidate, McdevData } from './types';
 import { ModDirectories } from './components/ModDirectories';
 import { WorldSettings } from './components/WorldSettings';
 import { GameOptions } from './components/GameOptions';
@@ -29,6 +29,8 @@ function App() {
   const [gameExecutableDiscoverySupported, setGameExecutableDiscoverySupported] = useState(false);
   const [gameExecutableDiscoveryLoaded, setGameExecutableDiscoveryLoaded] = useState(false);
   const [gameExecutablePaths, setGameExecutablePaths] = useState<string[]>([]);
+  const [modDirCandidates, setModDirCandidates] = useState<ModDirCandidate[]>([]);
+  const [modDirCandidatesLoaded, setModDirCandidatesLoaded] = useState(false);
   const [gameState, setGameState] = useState<GameRunState>('stopped');
 
   const initializedComponentsRef = useRef<Set<string>>(new Set());
@@ -94,6 +96,13 @@ function App() {
             ? msg.paths.filter((value: unknown): value is string => typeof value === 'string')
             : []);
           setGameExecutableDiscoveryLoaded(true);
+          break;
+        case 'modDirCandidates':
+          setModDirCandidates(Array.isArray(msg.candidates)
+            ? msg.candidates.filter((value: unknown): value is ModDirCandidate =>
+                typeof (value as ModDirCandidate)?.path === 'string')
+            : []);
+          setModDirCandidatesLoaded(true);
           break;
         case 'gameStatus':
           if (msg.state === 'stopped' || msg.state === 'launching' || msg.state === 'running') {
@@ -190,6 +199,11 @@ function App() {
     }
     setHasChanges(true);
   };
+
+  const requestModDirCandidates = useCallback((refresh = false) => {
+    setModDirCandidatesLoaded(false);
+    vscode.postMessage({ type: 'getModDirCandidates', refresh });
+  }, []);
 
   const handleKeyCapture = useCallback((key: string, keyCode: string) => {
     setData(prev => ({
@@ -358,6 +372,9 @@ function App() {
         modDirs={modDirs}
         setModDirs={setModDirs}
         setHasChanges={setHasChanges}
+        candidates={modDirCandidates}
+        candidatesLoaded={modDirCandidatesLoaded}
+        onRequestCandidates={requestModDirCandidates}
       />
 
       {/* World Settings */}

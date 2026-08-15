@@ -14,6 +14,15 @@ export interface I18nText {
   modDirectories: string;
   addModDirectory: string;
   browse: string;
+  browseModDirectory: string;
+  modDiscoveryShow: string;
+  modDiscoveryFilter: string;
+  modDiscoveryRefresh: string;
+  modDiscoveryScanning: string;
+  modDiscoveryEmpty: string;
+  modDiscoveryNoMatch: string;
+  modDiscoveryAdded: string;
+  modDiscoveryWorkspaceRoot: string;
   hotReload: string;
   analyzeMod: string;
   codeReview: string;
@@ -346,6 +355,15 @@ export const i18n: Record<string, I18nText> = {
     modDirectories: 'Mod Directories',
     addModDirectory: 'Add Mod Directory',
     browse: 'Browse...',
+    browseModDirectory: 'Pick a custom directory...',
+    modDiscoveryShow: 'Show detected mods',
+    modDiscoveryFilter: 'Filter mods...',
+    modDiscoveryRefresh: 'Rescan workspace',
+    modDiscoveryScanning: 'Scanning workspace...',
+    modDiscoveryEmpty: 'No mods detected in the workspace',
+    modDiscoveryNoMatch: 'No mods match the filter',
+    modDiscoveryAdded: 'Added',
+    modDiscoveryWorkspaceRoot: 'Workspace',
     hotReload: 'Hot Reload',
     analyzeMod: 'Analyze This Mod',
     codeReview: 'Code Review',
@@ -677,6 +695,15 @@ export const i18n: Record<string, I18nText> = {
     modDirectories: 'Mod 目录',
     addModDirectory: '添加 Mod 目录',
     browse: '浏览...',
+    browseModDirectory: '选择自定义目录...',
+    modDiscoveryShow: '显示发现的 Mod',
+    modDiscoveryFilter: '筛选 Mod...',
+    modDiscoveryRefresh: '重新扫描工作区',
+    modDiscoveryScanning: '正在扫描工作区...',
+    modDiscoveryEmpty: '工作区内未发现 Mod',
+    modDiscoveryNoMatch: '没有匹配的 Mod',
+    modDiscoveryAdded: '已添加',
+    modDiscoveryWorkspaceRoot: '当前工作区',
     hotReload: '热重载',
     analyzeMod: '分析此 Mod',
     codeReview: '代码诊断',

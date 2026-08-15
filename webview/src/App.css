@@ -1872,6 +1872,268 @@ button.mod-review-status:disabled {
   background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
+/* MOD 目录选择器：自动发现的候选 + 手动输入/浏览 */
+.mod-picker-root {
+  position: relative;
+}
+
+.mod-path-picker {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mod-path-picker .mod-path {
+  display: block;
+  width: 100%;
+  padding-right: 34px;
+}
+
+.mod-path-toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.mod-path-toggle:hover {
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.mod-path-toggle .codicon {
+  font-size: 13px;
+  transition: transform 140ms ease;
+}
+
+.mod-picker-root.open .mod-path-toggle .codicon,
+.mod-picker-root.open .mod-add-caret {
+  transform: rotate(180deg);
+}
+
+.mod-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mod-add-discover {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mod-add-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-add-caret {
+  flex: 0 0 auto;
+  opacity: 0.8;
+  transition: transform 140ms ease;
+}
+
+.mod-picker-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  min-width: 0;
+  padding: 4px;
+  color: var(--vscode-dropdown-foreground);
+  background-color: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border, var(--panel-border));
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  animation: numberSelectOpen 140ms ease-out;
+}
+
+.mod-add-picker .mod-picker-menu {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+
+.mod-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 5px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.mod-picker-toolbar > .codicon {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.mod-picker-toolbar .btn-icon {
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.mod-picker-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  color: var(--vscode-input-foreground);
+  background-color: transparent;
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+}
+
+.mod-picker-filter:focus {
+  outline: none;
+}
+
+.mod-picker-list {
+  max-height: 236px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.mod-picker-state {
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  text-align: center;
+}
+
+.mod-picker-option {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font-family: var(--vscode-font-family);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mod-picker-option:hover:not(:disabled) {
+  background-color: var(--vscode-list-hoverBackground);
+  color: var(--vscode-list-hoverForeground, var(--vscode-dropdown-foreground));
+}
+
+.mod-picker-option.selected {
+  color: var(--vscode-list-activeSelectionForeground);
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.mod-picker-option.used {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mod-picker-option > .codicon {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.mod-picker-option.selected > .codicon {
+  color: inherit;
+}
+
+.mod-picker-option-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mod-picker-option-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.mod-picker-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-picker-option-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.mod-picker-option.selected .mod-picker-option-path {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.mod-picker-tag {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--vscode-focusBorder) 26%, transparent);
+  color: var(--vscode-foreground);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mod-picker-meta {
+  flex: 0 0 auto;
+  color: var(--vscode-descriptionForeground);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mod-picker-option.selected .mod-picker-meta {
+  color: inherit;
+  opacity: 0.85;
+}
+
 .btn-icon {
   background: transparent;
   border: 1px solid transparent;
