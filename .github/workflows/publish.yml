@@ -1,9 +1,7 @@
 name: 发布到 VS Code 市场
 
+# 发布仅允许手动触发，避免普通提交重复请求 Marketplace。
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_type:
