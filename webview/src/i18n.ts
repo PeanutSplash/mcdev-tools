@@ -13,6 +13,8 @@ export interface I18nText {
   gameDebuggerToggle: string;
   modDirectories: string;
   addModDirectory: string;
+  showAllModDirectories: string;
+  showFewerModDirectories: string;
   browse: string;
   browseModDirectory: string;
   modDiscoveryShow: string;
@@ -61,6 +63,11 @@ export interface I18nText {
   betaApi: string;
   deferredTechnicalPreview: string;
   startupOptions: string;
+  logProtocol: string;
+  logProtocolDefault: string;
+  logProtocolSaf: string;
+  logProtocolDefaultTooltip: string;
+  logProtocolSafTooltip: string;
   gameRules: string;
   gameOptions: string;
   resetWorld: string;
@@ -354,6 +361,8 @@ export const i18n: Record<string, I18nText> = {
     gameDebuggerToggle: 'Enable game debugging',
     modDirectories: 'Mod Directories',
     addModDirectory: 'Add Mod Directory',
+    showAllModDirectories: 'Show all',
+    showFewerModDirectories: 'Show fewer',
     browse: 'Browse...',
     browseModDirectory: 'Pick a custom directory...',
     modDiscoveryShow: 'Show detected mods',
@@ -402,6 +411,11 @@ export const i18n: Record<string, I18nText> = {
     betaApi: 'Beta API Experiments',
     deferredTechnicalPreview: 'Deferred Rendering Preview',
     startupOptions: 'Startup Options',
+    logProtocol: 'Log protocol',
+    logProtocolDefault: 'Default',
+    logProtocolSaf: 'SAF',
+    logProtocolDefaultTooltip: 'The default log handling method collects Python logs by replacing the standard output stream.',
+    logProtocolSafTooltip: 'The official built-in standard protocol covers Python and more. It is more complete, but may have protocol compatibility issues.',
     gameRules: 'Game Rules',
     gameOptions: 'Game Options',
     resetWorld: 'Reset World',
@@ -489,7 +503,7 @@ export const i18n: Record<string, I18nText> = {
     hostBridgeClient: 'Client',
     hostBridgeServer: 'Server',
     hostBridgeCode: 'Python Code',
-    hostBridgeCodePlaceholder: "print(\"hello\")",
+    hostBridgeCodePlaceholder: "print(\"hello world\")",
     hostBridgeExecute: 'Run',
     hostBridgeExecuting: 'Running...',
     hostBridgeResult: 'Result',
@@ -694,6 +708,8 @@ export const i18n: Record<string, I18nText> = {
     gameDebuggerToggle: '启用游戏调试能力',
     modDirectories: 'Mod 目录',
     addModDirectory: '添加 Mod 目录',
+    showAllModDirectories: '展开全部',
+    showFewerModDirectories: '收起列表',
     browse: '浏览...',
     browseModDirectory: '选择自定义目录...',
     modDiscoveryShow: '显示发现的 Mod',
@@ -742,6 +758,11 @@ export const i18n: Record<string, I18nText> = {
     betaApi: 'Beta API 功能实验',
     deferredTechnicalPreview: '延迟渲染技术预览',
     startupOptions: '启动选项',
+    logProtocol: '日志流策略',
+    logProtocolDefault: '默认',
+    logProtocolSaf: 'SAF',
+    logProtocolDefaultTooltip: '默认的日志处理方案，通过改写标准输出流采取Python日志。',
+    logProtocolSafTooltip: '官方内置标准的协议，包括但不限于Python部分，更为丰富，但存在协议兼容性。',
     gameRules: '游戏规则',
     gameOptions: '游戏选项',
     resetWorld: '重置世界',
@@ -829,7 +850,7 @@ export const i18n: Record<string, I18nText> = {
     hostBridgeClient: '客户端',
     hostBridgeServer: '服务端',
     hostBridgeCode: 'Python 代码',
-    hostBridgeCodePlaceholder: "print(\"hello\")",
+    hostBridgeCodePlaceholder: "print(\"hello world\")",
     hostBridgeExecute: '执行',
     hostBridgeExecuting: '正在执行...',
     hostBridgeResult: '执行结果',
